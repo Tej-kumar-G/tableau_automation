@@ -6,25 +6,27 @@ Automate Tableau operations like content management, ownership updates, download
 
 ## Project Structure
 
-tableau_automation 2/
-├── main.py
-├── routers/
-│ └── tableau.py
-├── base_setup/
-│ ├── config/
-│ │ ├── config.example.yaml
-│ │ └── logging_config.yaml
-│ ├── utils/
-│ │ └── common_utils.py
-│ └── requirements.txt
-├── downloads/
-├── logs/
-├── scripts/
-│ ├── content_management/
-│ ├── download_utils/
-│ └── revision_history/
-├── tests/
-└── venv/
+```plaintext
+    tableau_automation 2/
+    ├── main.py
+    ├── routers/
+    │ └── tableau.py
+    ├── base_setup/
+    │ ├── config/
+    │ │ ├── config.example.yaml
+    │ │ └── logging_config.yaml
+    │ ├── utils/
+    │ │ └── common_utils.py
+    │ └── requirements.txt
+    ├── downloads/
+    ├── logs/
+    ├── scripts/
+    │ ├── content_management/
+    │ ├── download_utils/
+    │ └── revision_history/
+    ├── tests/
+    └── venv/
+```
 
 
 
