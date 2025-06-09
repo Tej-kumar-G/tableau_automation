@@ -1,0 +1,7 @@
+tableau:
+  server_url: https://your-tableau-server.com
+  token_name: your-token-name
+  personal_access_token: your-token-here
+  site_id: your-site-id
+  log_path: logs/tableau.log
+  download_path: downloads

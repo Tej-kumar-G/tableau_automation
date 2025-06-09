@@ -1,0 +1,32 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  standard:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  detailed:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(pathname)s:%(lineno)d'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: standard
+    stream: ext://sys.stdout
+
+  file:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/tableau_automation.log
+    encoding: utf8
+
+loggers:
+  tableau_automation:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+
+root:
+  level: INFO
+  handlers: [console] 
