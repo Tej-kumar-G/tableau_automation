@@ -7,7 +7,7 @@ Automate Tableau operations like content management, ownership updates, download
 ## Project Structure
 
 ```plaintext
-    tableau_automation 2/
+    tableau_automation/
     ├── main.py
     ├── routers/
     │ └── tableau.py
@@ -112,6 +112,7 @@ Logging
 
 
 Tests
+
     Run tests with:
     
         pytest tests/
