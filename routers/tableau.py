@@ -1,37 +1,30 @@
-import logging
-from fastapi import APIRouter, HTTPException, logger
-from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Literal
-from typing import Optional, List
-from scripts.content_management.create_content import create_project, create_workbook, list_projects
-from scripts.content_management.move_content import move_content
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, EmailStr
+
+from scripts.content_management.copy_content import copy_workbook_to_project
+from scripts.content_management.create_content import create_project
 from scripts.content_management.delete_content import delete_content
+from scripts.content_management.move_content import move_content
 from scripts.content_management.update_ownership import update_ownership
-from scripts.revision_history.get_revision_history import get_revision_history
 from scripts.download_utils.download_content import download_content
+from scripts.revision_history.get_revision_history import get_revision_history
+from scripts.site_monitoring.slack_connectivity import slack_integration_with_webhook
 
 router = APIRouter()
-
-class ProjectCreateRequest(BaseModel):
-    project_name: str
-    description: Optional[str] = ""
 
 class WorkbookCreateRequest(BaseModel):
     workbook_name: str
     target_project: str
-    source_project: str
+    source_project: str | None = None
 
 
 class MoveContentRequest(BaseModel):
-    content_type: str
+    content_type: str      # "workbook" or "datasource"
     content_name: str
     source_project: str
     new_project: str
-
-class DeleteContentRequest(BaseModel):
-    content_type: str
-    content_name: str
-    project_name: str
 
 
 # ['tej.gangineni@gmail.com','nitheeshkumargorla111@gmail.com']
@@ -55,6 +48,17 @@ class DownloadRequest(BaseModel):
     format_type: Optional[str] = None # e.g., 'pdf', 'csv', 'twb'
 
 
+class ProjectCreateRequest(BaseModel):
+    project_name: str
+    description: str = ""
+
+
+class DeleteContentRequest(BaseModel):
+    content_type: str  # "project", "workbook", "datasource"
+    content_name: str
+    project_name: Optional[str] = None
+
+
 @router.post("/create_project")
 def api_create_project(req: ProjectCreateRequest):
     result = create_project(req.project_name, req.description)
@@ -62,10 +66,12 @@ def api_create_project(req: ProjectCreateRequest):
         raise HTTPException(status_code=400, detail=result["message"])
     return result
 
-@router.post("/create_workbook")
-def api_create_workbook(req: WorkbookCreateRequest):
-    # log_blank_line(logger)
-    result = create_workbook(req.workbook_name, req.target_project, req.source_project)
+
+
+
+@router.post("/delete_content")
+def api_delete_content(req: DeleteContentRequest):
+    result = delete_content(req.content_type, req.content_name, project_name=req.project_name)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["message"])
     return result
@@ -74,21 +80,15 @@ def api_create_workbook(req: WorkbookCreateRequest):
 @router.post("/move_content")
 def api_move_content(req: MoveContentRequest):
     result = move_content(req.content_type, req.content_name, req.source_project, req.new_project)
+
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["message"])
-    return result
 
-@router.post("/delete_content")
-def api_delete_content(req: DeleteContentRequest):
-    result = delete_content(req.content_type, req.content_name,project_name=req.project_name)
-    if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["message"])
     return result
-
 @router.post("/update_ownership")
 def api_update_ownership(req: UpdateOwnershipRequest):
     # Placeholder call to the script function
-    result = update_ownership(req.content_type, req.content_name, req.current_owner, req.new_owner, req.project_name)
+    result = update_ownership(req.content_type, req.content_name, str(req.current_owner), str(req.new_owner), req.project_name)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["message"])
     return result
@@ -101,10 +101,26 @@ def api_revision_history(req: RevisionHistoryRequest):
         raise HTTPException(status_code=400, detail=result["message"])
     return result
 
-@router.post("/download")
+@router.post("/download_content")
 def api_download(req: DownloadRequest):
     # Placeholder call to the script function
-    result = download_content(req.content_type, req.content_name, req.project_name, req.format_type)
+    result = download_content(req.content_type, req.content_name, req.project_name)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["message"])
-    return result 
+    return result
+
+@router.post("/copy_content")
+def api_create_workbook(req: WorkbookCreateRequest):
+    # log_blank_line(logger)
+    result = copy_workbook_to_project(req.workbook_name, req.source_project, req.target_project)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+@router.get("/slack_connection")
+def slack_connection():
+    """
+    Placeholder endpoint to test Slack connection.
+    This can be replaced with actual Slack integration logic.
+    """
+    return slack_integration_with_webhook()

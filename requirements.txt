@@ -6,3 +6,6 @@ pydantic
 requests
 slack_sdk
 gql
+httpx
+pydantic[email]
+requests_toolbelt>=0.9.1

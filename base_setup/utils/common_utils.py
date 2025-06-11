@@ -1,3 +1,5 @@
+import os
+
 import yaml
 import logging
 import logging.config
@@ -17,6 +19,9 @@ def setup_logging(logging_config_path: str):
     try:
         with open(logging_config_path, 'r') as file:
             logging_config = yaml.safe_load(file)
+            log_file_path = logging_config['handlers']['file']['filename']
+            log_dir = os.path.dirname(log_file_path)
+            os.makedirs(log_dir, exist_ok=True)
             logging.config.dictConfig(logging_config)
     except Exception as e:
         raise Exception(f"Error setting up logging: {str(e)}")
