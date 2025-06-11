@@ -34,7 +34,7 @@ class DeleteContentRequest(BaseModel):
     project_name: str
 
 
-# [tej.gangineni@gmail.com','nitheeshkumargorla111@gmail.com']
+# ['tej.gangineni@gmail.com','nitheeshkumargorla111@gmail.com']
 class UpdateOwnershipRequest(BaseModel):
     content_type: str  # 'workbook' or 'project'
     content_name: str  # workbook name or project name

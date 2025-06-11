@@ -52,60 +52,27 @@ def find_workbook(server: TSC.Server, workbook_name: str, project_id: Optional[s
     return None
 
 
-
-def update_project_ownership(server: TSC.Server,project_name: str,requesting_user_email: str, new_owner_email: str) -> dict:
-    try:
-        logger.info(f"Attempting ownership update for project '{project_name}'")
+def find_datasource(server: TSC.Server, datasource_name: str, project_id: Optional[str] = None) -> Optional[TSC.DatasourceItem]:
+    """Find a datasource by name and optional project ID."""
+    logger.debug(f"Searching datasource: {datasource_name} in project ID: {project_id}")
+    
+    # Search in project or globally
+    all_datasources, _ = server.datasources.get()
+    filtered = [ds for ds in all_datasources 
+               if ds.name.strip().lower() == datasource_name.strip().lower()]
+    
+    if project_id:
+        filtered = [ds for ds in filtered if ds.project_id == project_id]
         
-        # Find the project
-        project = find_project(server, project_name)
-        if not project:
-            msg = f"Project '{project_name}' not found."
-            logger.error(msg)
-            return {"success": False, "message": msg}
-
-        # Find new owner
-        new_owner = find_user_by_email(server, new_owner_email)
-        if not new_owner:
-            msg = f"New owner '{new_owner_email}' not found."
-            logger.error(msg)
-            return {"success": False, "message": msg}
-
-        # Permission check if requesting_user provided
-        if requesting_user_email:
-            requesting_user = find_user_by_email(server, requesting_user_email)
-            if not requesting_user:
-                msg = f"Requesting user '{requesting_user_email}' not found."
-                logger.error(msg)
-                return {"success": False, "message": msg}
-
-            if project.owner_id != requesting_user.id:
-                current_owner = next((u for u in server.users.get()[0] if u.id == project.owner_id), None)
-                owner_name = current_owner.email if current_owner else str(project.owner_id)
-                msg = (f"Permission denied: Requesting user '{requesting_user_email}' "
-                      f"is not the current owner ('{owner_name}')")
-                logger.warning(msg)
-                return {"success": False, "message": msg}
-
-        # Get current owner details for logging
-        current_owner = next((u for u in server.users.get()[0] if u.id == project.owner_id), None)
-        current_owner_email = current_owner.email if current_owner else f"ID:{project.owner_id}"
-
-        logger.info(
-            f"Transferring ownership of '{project_name}' "
-            f"from '{current_owner_email}' to '{new_owner_email}'"
-        )
-
-        # Update ownership
-        project.owner_id = new_owner.id
-        server.projects.update(project)
-
-        logger.info("Ownership updated successfully")
-        return {"success": True, "message": f"Project ownership updated to '{new_owner_email}'"}
-
-    except Exception as e:
-        logger.error(f"Unexpected error updating ownership: {str(e)}")
-        return {"success": False, "message": f"An error occurred: {str(e)}"}
+    if len(filtered) == 1:
+        full_datasource = server.datasources.get_by_id(filtered[0].id)
+        logger.debug(f"Found datasource: {full_datasource.name} with ID: {full_datasource.id}")
+        return full_datasource
+    elif len(filtered) > 1:
+        logger.warning(f"Multiple datasources found with name '{datasource_name}'.")
+    else:
+        logger.warning(f"No datasource found with name '{datasource_name}'")
+    return None
 
 
 def update_workbook_ownership(server: TSC.Server, workbook_name: str, current_owner_email: str, new_owner_email: str, project_name: Optional[str]) -> dict:
@@ -145,6 +112,43 @@ def update_workbook_ownership(server: TSC.Server, workbook_name: str, current_ow
     logger.info(f"Workbook '{workbook_name}' ownership changed successfully to '{new_owner_email}'")
     return {"success": True, "message": f"Workbook '{workbook_name}' ownership changed to '{new_owner_email}'"}
 
+
+def update_datasource_ownership(server: TSC.Server, datasource_name: str, current_owner_email: str, 
+                              new_owner_email: str, project_name: Optional[str] = None) -> dict:
+    """Update ownership of a datasource in a project."""
+    logger.info(f"Updating ownership of datasource '{datasource_name}' (Project: {project_name}) from '{current_owner_email}' to '{new_owner_email}'")
+    
+    project_id = None
+    
+    if project_name:
+        project = find_project(server, project_name)
+        if not project:
+            return {"success": False, "message": f"Project '{project_name}' not found."}
+        project_id = project.id
+
+    datasource = find_datasource(server, datasource_name, project_id)
+    if not datasource:
+        return {"success": False, "message": f"Datasource '{datasource_name}' not found."}
+
+    current_owner = find_user_by_email(server, current_owner_email)
+    if not current_owner:
+        return {"success": False, "message": f"Current owner '{current_owner_email}' not found."}
+
+    if datasource.owner_id != current_owner.id:
+        logger.warning(f"Current owner mismatch for datasource '{datasource_name}'")
+        return {"success": False, "message": "Current owner does not match the actual owner of the datasource."}
+
+    new_owner = find_user_by_email(server, new_owner_email)
+    if not new_owner:
+        return {"success": False, "message": f"New owner '{new_owner_email}' not found."}
+
+    datasource.owner_id = new_owner.id
+    server.datasources.update(datasource)
+    logger.info(f"Datasource '{datasource_name}' ownership changed successfully to '{new_owner_email}'")
+    return {"success": True, "message": f"Datasource '{datasource_name}' ownership changed to '{new_owner_email}'"}
+
+
+
 def update_ownership(content_type: str, content_name: str, current_owner: str, new_owner: str, project_name: Optional[str] = None) -> dict:
     try:
         logger.info(f"Request to update ownership - Type: {content_type}, Content: {content_name}, From: {current_owner}, To: {new_owner}, Project: {project_name}")
@@ -154,13 +158,11 @@ def update_ownership(content_type: str, content_name: str, current_owner: str, n
         with server.auth.sign_in(tableau_auth):
             if content_type.lower() == 'workbook':
                 return update_workbook_ownership(server, content_name, current_owner, new_owner, project_name)
-            elif content_type.lower() == 'project':
-                # Try Metadata API first
-                result = update_project_ownership(server, content_name,current_owner, new_owner)
-                return result
+            elif content_type.lower() == 'datasource':
+                return update_datasource_ownership(server, content_name, current_owner, new_owner, project_name)
             else:
                 logger.error(f"Invalid content type: {content_type}")
-                return {"success": False, "message": "Invalid content type. Use 'workbook' or 'project'."}
+                return {"success": False, "message": "Invalid content type. Use 'workbook' or 'datasource'."}
     except Exception as e:
         logger.error(f"Error in update_ownership: {e}", exc_info=True)
         return {"success": False, "message": f"Exception occurred: {str(e)}"}
