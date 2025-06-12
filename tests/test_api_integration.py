@@ -1,142 +1,207 @@
 import os
+import sys
 import time
-import unittest
-from fastapi.testclient import TestClient
+from pathlib import Path
+
+import pytest
+import pytest_asyncio
+import logging
+from httpx import AsyncClient, ASGITransport
 from main import app
 
+from base_setup.utils.common_utils import setup_logging
 
-class TestCustomApiIntegration(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """Set up test client and create unique projects for each test case."""
-        cls.client = TestClient(app)
-        cls.timestamp = int(time.time())
 
-        # Common workbook and source project
-        cls.test_workbook_name = "Superstore"
-        cls.source_project_name = "Samples"
+# Setup logging
+# ------ Add base_setup to sys.path and import logging setup ------
+base_setup_path = str(Path(__file__).parent.parent / 'base_setup')
+sys.path.append(base_setup_path)
+# ------ Setup logging using external YAML config ------
+setup_logging(os.path.join(base_setup_path, 'config', 'logging_config.yaml'))
+logger = logging.getLogger("tableau_automation")
 
-        # Unique project names for each test
-        cls.projects = {
-            "create": f"Project_Create_{cls.timestamp}",
-            "move": f"Project_Move_{cls.timestamp + 1}",
-            "ownership": f"Project_Ownership_{cls.timestamp + 2}",
-            "download": f"Project_Download_{cls.timestamp + 3}",
-            "delete": f"Project_Delete_{cls.timestamp + 4}",
-        }
+# Constants
+TEST_WORKBOOK = "Superstore"
+SOURCE_PROJECT = "Samples"
 
-        # Create all projects once
-        for key, project_name in cls.projects.items():
-            if key == "create":
-                continue
-            print(f"Creating project for {key}: {project_name}")
-            resp = cls.client.post("/tableau/create_project", json={
-                "project_name": project_name,
-                "description": f"Test project for {key}"
-            })
-            print(f"Create response [{key}]: {resp.status_code} - {resp.json().get('message', '')}")
 
-    @classmethod
-    def tearDownClass(cls):
-        """Delete all test projects created."""
-        print("\nCleaning up test projects...")
-        for key, project_name in cls.projects.items():
-            response = cls.client.post("/tableau/delete_content", json={
-                "content_type": "project",
-                "content_name": project_name
-            })
-            print(f"Deleted project [{key}]: {project_name} - {response.status_code}")
+# ----------- Logging Helper ----------- #
+def log_section(title: str, data: dict):
+    logger.info(f"\n========== {title.upper()} ==========")
+    for key, value in data.items():
+        logger.info(f"{key:<18}: {value}")
+    logger.info(f"========== END: {title.upper()} ==========\n")
 
-    def test_create_project(self):
-        """Test attempting to create an already existing project."""
-        project = self.projects["create"]
-        response = self.client.post("/tableau/create_project", json={
-            "project_name": project,
-            "description": "Attempt duplicate creation"
+
+# ----------- Fixtures ----------- #
+@pytest.fixture(scope="session")
+def timestamp():
+    return int(time.time())
+
+
+@pytest.fixture(scope="session")
+def test_projects(timestamp):
+    return {
+        "create": f"Project_Create_{timestamp}",
+        "move": f"Project_Move_{timestamp + 1}",
+        "ownership": f"Project_Ownership_{timestamp + 2}",
+        "download": f"Project_Download_{timestamp + 3}",
+        "delete": f"Project_Delete_{timestamp + 4}",
+    }
+
+
+@pytest_asyncio.fixture(scope="session")
+async def async_client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def one_time_project_setup_and_teardown(async_client, test_projects):
+    logger.info("🚧 One-time setup: Creating all test projects (except 'create')")
+    for key, name in test_projects.items():
+        if key == "create":
+            continue
+        resp = await async_client.post("/tableau/create_project", json={
+            "project_name": name,
+            "description": f"Test project for {key}"
         })
-        self.assertEqual(response.status_code, 200)
-
-    def test_move_content(self):
-        """Test moving a workbook within the same project (simulated)."""
-        project = self.projects["move"]
-        self.client.post("/tableau/copy_content", json={
-            "workbook_name": self.test_workbook_name,
-            "source_project": self.source_project_name,
-            "target_project": project
+        logger.info(f"📁 Created [{key}] '{name}' -> {resp.status_code}")
+    yield
+    logger.info("🧹 Cleanup: Deleting all test projects")
+    for key, name in test_projects.items():
+        resp = await async_client.post("/tableau/delete_content", json={
+            "content_type": "project",
+            "content_name": name
         })
-
-        response = self.client.post("/tableau/move_content", json={
-            "content_type": "workbook",
-            "content_name": self.test_workbook_name,
-            "source_project": project,
-            "new_project": project
-        })
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json().get("success"))
-
-    def test_update_ownership(self):
-        """Test updating ownership of a copied workbook."""
-        project = self.projects["ownership"]
-        self.client.post("/tableau/copy_content", json={
-            "workbook_name": self.test_workbook_name,
-            "source_project": self.source_project_name,
-            "target_project": project
-        })
-
-        # These emails must be valid Tableau users in your org
-        current_owner = "tej.gangineni@gmail.com"
-        new_owner = "nitheeshkumargorla111@gmail.com"
-
-        response = self.client.post("/tableau/update_ownership", json={
-            "content_type": "workbook",
-            "content_name": self.test_workbook_name,
-            "project_name": project,
-            "current_owner": current_owner,
-            "new_owner": new_owner
-        })
-        self.assertEqual(response.status_code, 200, f"Ownership update failed: {response.text}")
-        self.assertTrue(response.json().get("success"))
-
-    def test_download_content(self):
-        """Test downloading a workbook after copying it."""
-        project = self.projects["download"]
-        self.client.post("/tableau/copy_content", json={
-            "workbook_name": self.test_workbook_name,
-            "source_project": self.source_project_name,
-            "target_project": project
-        })
-
-        response = self.client.post("/tableau/download_content", json={
-            "content_type": "workbook",
-            "content_name": self.test_workbook_name,
-            "project_name": project
-        })
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json().get("success"))
-        download_path = response.json().get("download_path")
-        self.assertTrue(download_path and os.path.exists(download_path),
-                        f"File not found at {download_path}")
-
-    def test_delete_content(self):
-        """Test deleting a copied workbook."""
-        project = self.projects["delete"]
-        self.client.post("/tableau/copy_content", json={
-            "workbook_name": self.test_workbook_name,
-            "source_project": self.source_project_name,
-            "target_project": project
-        })
-
-        response = self.client.post("/tableau/delete_content", json={
-            "content_type": "workbook",
-            "content_name": self.test_workbook_name,
-            "project_name": project
-        })
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json().get("success"))
+        logger.info(f"🗑️ Deleted [{key}] '{name}' -> {resp.status_code}")
 
 
-    def test_slack_connection(self):
-        """Test Slack connection endpoint."""
-        response = self.client.get("/tableau/slack_connection")
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json().get("success"))
+# ----------- Helper ----------- #
+async def copy_workbook(async_client, project):
+    logger.info(f"📥 Copying workbook '{TEST_WORKBOOK}' to project '{project}'")
+    resp = await async_client.post("/tableau/copy_content", json={
+        "workbook_name": TEST_WORKBOOK,
+        "source_project": SOURCE_PROJECT,
+        "target_project": project
+    })
+    logger.info(f"📥 Copy Response: {resp.status_code} | {resp.json()}")
+    return resp
+
+
+# ----------- Test Cases ----------- #
+
+@pytest.mark.asyncio
+async def test_create_project(async_client, test_projects):
+    project = test_projects["create"]
+    resp = await async_client.post("/tableau/create_project", json={
+        "project_name": project,
+        "description": "Duplicate create test"
+    })
+    log_section("Create Project", {
+        "📁 Project": project,
+        "📡 Status Code": resp.status_code,
+        "✅ Success": resp.json().get("success", "N/A"),
+        "📨 Message": resp.json().get("message", "N/A")
+    })
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_move_content(async_client, test_projects):
+    project = test_projects["move"]
+    await copy_workbook(async_client, project)
+    resp = await async_client.post("/tableau/move_content", json={
+        "content_type": "workbook",
+        "content_name": TEST_WORKBOOK,
+        "source_project": project,
+        "new_project": project
+    })
+    log_section("Move Workbook", {
+        "📁 Project": project,
+        "📄 Workbook": TEST_WORKBOOK,
+        "📡 Status Code": resp.status_code,
+        "✅ Success": resp.json().get("success")
+    })
+    assert resp.status_code == 200
+    assert resp.json().get("success")
+
+
+@pytest.mark.asyncio
+async def test_update_ownership(async_client, test_projects):
+    project = test_projects["ownership"]
+    await copy_workbook(async_client, project)
+    current_owner = "tej.gangineni@gmail.com"
+    new_owner = "nitheeshkumargorla111@gmail.com"
+    resp = await async_client.post("/tableau/update_ownership", json={
+        "content_type": "workbook",
+        "content_name": TEST_WORKBOOK,
+        "project_name": project,
+        "current_owner": current_owner,
+        "new_owner": new_owner
+    })
+    log_section("Update Ownership", {
+        "📁 Project": project,
+        "📄 Workbook": TEST_WORKBOOK,
+        "👤 From": current_owner,
+        "👤 To": new_owner,
+        "📡 Status Code": resp.status_code,
+        "✅ Success": resp.json().get("success")
+    })
+    assert resp.status_code == 200
+    assert resp.json().get("success")
+
+
+@pytest.mark.asyncio
+async def test_download_content(async_client, test_projects):
+    project = test_projects["download"]
+    await copy_workbook(async_client, project)
+    resp = await async_client.post("/tableau/download_content", json={
+        "content_type": "workbook",
+        "content_name": TEST_WORKBOOK,
+        "project_name": project
+    })
+    data = resp.json()
+    log_section("Download Workbook", {
+        "📁 Project": project,
+        "📄 Workbook": TEST_WORKBOOK,
+        "📡 Status Code": resp.status_code,
+        "✅ Success": data.get("success"),
+        "📂 Path Exists": os.path.exists(data.get("download_path", "")),
+        "📎 Path": data.get("download_path", "")
+    })
+    assert resp.status_code == 200
+    assert data.get("success")
+    assert os.path.exists(data.get("download_path"))
+
+
+@pytest.mark.asyncio
+async def test_delete_content(async_client, test_projects):
+    project = test_projects["delete"]
+    await copy_workbook(async_client, project)
+    resp = await async_client.post("/tableau/delete_content", json={
+        "content_type": "workbook",
+        "content_name": TEST_WORKBOOK,
+        "project_name": project
+    })
+    log_section("Delete Workbook", {
+        "📁 Project": project,
+        "📄 Workbook": TEST_WORKBOOK,
+        "📡 Status Code": resp.status_code,
+        "✅ Success": resp.json().get("success")
+    })
+    assert resp.status_code == 200
+    assert resp.json().get("success")
+
+
+@pytest.mark.asyncio
+async def test_slack_connection(async_client):
+    resp = await async_client.get("/tableau/slack_connection")
+    log_section("Slack Connectivity", {
+        "📡 Status Code": resp.status_code,
+        "✅ Success": resp.json().get("success"),
+        "🔗 Message": resp.json().get("message", "N/A")
+    })
+    assert resp.status_code == 200
+    assert resp.json().get("success")

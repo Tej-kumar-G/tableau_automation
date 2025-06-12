@@ -8,6 +8,7 @@ import tableauserverclient as TSC
 # Base setup
 base_setup_path = str(Path(__file__).parent.parent.parent / 'base_setup')
 import sys
+
 sys.path.append(base_setup_path)
 
 from base_setup.utils.common_utils import load_config, setup_logging, get_tableau_server_and_auth
@@ -26,9 +27,9 @@ def find_project(server: TSC.Server, project_name: str) -> Optional[TSC.ProjectI
 
 
 def copy_workbook_to_project(
-    workbook_name: str,
-    source_project_name: str,
-    target_project_name: str
+        workbook_name: str,
+        source_project_name: str,
+        target_project_name: str
 ) -> dict:
     """
     Copy a workbook from source project to target project by downloading and republishing.
@@ -54,7 +55,8 @@ def copy_workbook_to_project(
                 None
             )
             if not workbook:
-                return {"success": False, "message": f"Workbook '{workbook_name}' not found in project '{source_project_name}'."}
+                return {"success": False,
+                        "message": f"Workbook '{workbook_name}' not found in project '{source_project_name}'."}
 
             # Download the workbook in memory
             file_obj = BytesIO()

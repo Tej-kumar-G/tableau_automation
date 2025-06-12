@@ -6,6 +6,7 @@ import logging.config
 from pathlib import Path
 from tableauserverclient import Server, PersonalAccessTokenAuth
 
+
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file."""
     try:
@@ -13,6 +14,7 @@ def load_config(config_path: str) -> dict:
             return yaml.safe_load(file)
     except Exception as e:
         raise Exception(f"Error loading config file {config_path}: {str(e)}")
+
 
 def setup_logging(logging_config_path: str):
     """Setup logging configuration."""
@@ -26,9 +28,11 @@ def setup_logging(logging_config_path: str):
     except Exception as e:
         raise Exception(f"Error setting up logging: {str(e)}")
 
+
 def ensure_directory_exists(directory: str):
     """Ensure that a directory exists, create if it doesn't."""
     Path(directory).mkdir(parents=True, exist_ok=True)
+
 
 def get_tableau_server_and_auth(config: dict) -> tuple[Server, PersonalAccessTokenAuth]:
     """
@@ -40,4 +44,4 @@ def get_tableau_server_and_auth(config: dict) -> tuple[Server, PersonalAccessTok
         config['tableau']['personal_access_token'],
         site_id=config['tableau']['site_id']
     )
-    return server, tableau_auth 
+    return server, tableau_auth
