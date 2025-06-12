@@ -1,123 +1,133 @@
-# Tableau Automation Project
 
-Automate Tableau operations like content management, ownership updates, downloads, and revision history retrieval using Python and Tableau Server Client API.
+# 📊 Tableau Automation Project
+
+Automate Tableau operations such as content management, ownership transfer, downloads, and revision history using Python scripts. This project is script-first, focusing on standalone automation, with optional API support via FastAPI.
 
 ---
 
-## Project Structure
+## 🗂️ Project Structure
 
-```plaintext
-    tableau_automation/
-    ├── main.py
-    ├── routers/
-    │ └── tableau.py
-    ├── base_setup/
-    │ ├── config/
-    │ │ ├── config.example.yaml
-    │ │ └── logging_config.yaml
-    │ ├── utils/
-    │ │ └── common_utils.py
-    │ └── requirements.txt
-    ├── downloads/
-    ├── logs/
-    ├── scripts/
-    │ ├── content_management/
-    │ ├── download_utils/
-    │ └── revision_history/
-    ├── tests/
-    └── venv/
+
+```
+tableau_automation/
+├── main.py                         # Optional FastAPI entry point
+├── routers/
+│   └── tableau.py                  # API endpoint definitions
+├── base_setup/
+│   ├── config/
+│   │   ├── config.yaml             # Tableau & Slack config
+│   │   └── logging_config.yaml     # Logging setup
+│   └── utils/                      # Shared helpers/utilities
+├── scripts/                        # Core Tableau automation logic
+│   ├── content_management/
+│   ├── download_utils/
+│   ├── monitoring/
+│   ├── revision_history/
+│   └── site_monitoring/
+│       ├── run_monitoring.py
+│       └── slack_connectivity.py
+├── test_data/                      # Sample inputs/data
+├── tests/
+│   ├── downloads/                  # Download output directory
+│   ├── logs/                       # Log output directory
+│   ├── conftest.py
+│   ├── test_misc_connectivity.py
+│   └── test_tableau_workflow.py
+├── requirements.txt
+├── README.md
+└── .gitignore
 ```
 
 
+## ⚙️ Setup Instructions
+
+### 1. Clone the Repository
+
+```bash
+git clone ....git
+cd tableau_automation
+```
+
+### 2. Create & Activate a Virtual Environment
+
+```bash
+python -m venv venv
+source venv/bin/activate        # macOS/Linux
+venv\Scripts\activate         # Windows
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure Tableau & Slack
+
+Create a `config.yaml` in `base_setup/config/` with the following structure:
+
+```yaml
+tableau:
+  server_url: ""
+  token_name: ""
+  personal_access_token: ""
+  site_id: ""
+  log_path: tests/logs/tableau.log
+  download_path: tests/downloads
+
+slack:
+  webhook_url: ""
+```
 
 ---
 
-## Features
+## 🚀 How to Run Scripts
 
-- Manage Tableau content (create, move, delete).
-- Update ownership of workbooks and data sources.
-- Download workbooks, views, and data sources in various formats.
-- Fetch revision history for Tableau workbooks.
-- Configurable via YAML config file or environment variables.
-- FastAPI-based API endpoints for automation and integration.
+Each Python script inside `scripts/` is standalone. Run them as:
 
----
+```bash
+python scripts/site_monitoring/run_monitoring.py
+```
 
-## Prerequisites
-
-- Python 3.8+
-- Tableau Server or Tableau Online with API access
-- Personal Access Token for authentication
+Logs will be stored in `tests/logs/` and any downloaded files will be placed in `tests/downloads/`.
 
 ---
 
-## Setup
+## 🧪 Run Tests
 
-1. **Clone the repository**
+```bash
+PYTHONPATH=.:$PYTHONPATH pytest tests/
+```
 
-    ```bash
-    git clone https://github.com/your-account-name/tableau_automation.git
-    cd tableau_automation
-    ``` 
-
-
-2. Create and activate virtual environment
-
-    ```bash
-    python -m venv venv
-    source venv/bin/activate   # Linux/Mac
-    venv\Scripts\activate      # Windows
-    ```
-
-3. Install dependencies
-
-    ```bash
-    pip install -r base_setup/requirements.txt
-    ```
-
-
-4. Configure your Tableau connection
-
-    Copy base_setup/config/config.example.yaml to config.yaml
-
-    Fill in your Tableau server URL, token, and site ID in config.yaml
+This command validates connectivity, Tableau operations, and logging via defined test cases.
 
 ---
- 
- 
-Running the Project
 
-    Start the FastAPI server:
+## 🌐 Optional FastAPI API
 
-        uvicorn main:app --reload
+To run the API server:
 
+```bash
+uvicorn main:app --reload
+```
 
-Usage
-    Use the provided API endpoints in /routers/tableau.py to:
+Open in browser: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-        Create, move, delete content
+---
 
-        Update ownership
-
-        Download Tableau content
-
-        Retrieve revision history
-
-    Refer to the API docs for request/response details.
+## 💬 Interview Highlights
 
 
-Logging
-
-    Logs are stored in logs/tableau_automation.log with configurable levels in logging_config.yaml.
-
-
-Tests
-
-    Run tests with:
-    
-        pytest tests/
+- **Primary focus is on automation scripts**, not APIs.
+- **All logic is config-driven** via YAML for easy changes.
+- **Secure PAT-based access** for Tableau authentication.
+- **Test cases included** for repeatable validations.
+- **Slack integration** for alerts/notifications on execution.
 
 
-License
+---
 
-    MIT License
+## 📜 License
+
+MIT License – free for personal and commercial use.
+

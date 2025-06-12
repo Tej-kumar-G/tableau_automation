@@ -1,113 +1,86 @@
-import sys
-import os
 import logging
+import os
+import sys
 from pathlib import Path
+from typing import Dict, Optional
+import tableauserverclient as TSC
 
-# Add the base_setup directory to the Python path
+# Add base_setup to path
 base_setup_path = str(Path(__file__).parent.parent.parent / 'base_setup')
 sys.path.append(base_setup_path)
 
 from base_setup.utils.common_utils import load_config, setup_logging, get_tableau_server_and_auth, ensure_directory_exists
 
-# Setup logging
+# Logging
 setup_logging(os.path.join(base_setup_path, 'config', 'logging_config.yaml'))
 logger = logging.getLogger('tableau_automation')
 
 
-
-def download_content(content_type: str, content_name: str, project_name: str | None = None, format_type: str | None = None) -> dict:
+def download_content(content_type: str, content_name: str, project_name: Optional[str] = None) -> Dict[str, object]:
     """
-    Download content (workbook or datasource) from Tableau Server.
-    
+    Download a workbook (.twbx) or datasource (.tdsx) from Tableau Server.
+
     Args:
-        content_type (str): Type of content ('workbook' or 'datasource')
-        content_name (str): Name of the content
-        project_name (str, optional): Project name to narrow down search.
-        format_type (str, optional): Format to download (e.g., 'pdf', 'csv', 'twb').
-        
+        content_type (str): "workbook" or "datasource"
+        content_name (str): Name of the content to download
+        project_name (str, optional): Filter by project
+
     Returns:
-        dict: Result with download path if successful.
+        dict: { success: bool, message: str, download_path?: str }
     """
     try:
-        if content_type.lower() not in ['workbook', 'datasource']:
-            return {
-                "success": False,
-                "message": f"Invalid content type: {content_type}. Must be 'workbook' or 'datasource'"
-            }
+        content_type = content_type.lower()
+        if content_type not in ["workbook", "datasource"]:
+            return {"success": False, "message": f"Invalid content type: {content_type}"}
 
         config = load_config(os.path.join(base_setup_path, 'config', 'config.yaml'))
-        server, tableau_auth = get_tableau_server_and_auth(config)
-        download_path_base = config.get('tableau', {}).get('download_path', 'downloads')
-        ensure_directory_exists(download_path_base)
+        server, auth = get_tableau_server_and_auth(config)
+        download_dir = config.get("tableau", {}).get("download_path", "downloads")
+        ensure_directory_exists(download_dir)
 
-        with server.auth.sign_in(tableau_auth):
-            # Find the content item
-            if content_type.lower() == 'workbook':
-                if not format_type:
-                    return {"success": False, "message": "format_type is required for workbooks"}
-                all_items = server.workbooks.get()[0]
+        with server.auth.sign_in(auth):
+            # Fetch items
+            if content_type == "workbook":
+                items, _ = server.workbooks.get()
+                extension = "twbx"
             else:
-                all_items = server.datasources.get()[0]
+                items, _ = server.datasources.get()
+                extension = "tdsx"
 
             # Filter by name
-            filtered_items = [item for item in all_items 
-                           if item.name.lower() == content_name.lower()]
+            filtered = [item for item in items if item.name.strip().lower() == content_name.strip().lower()]
 
-            # Filter by project if specified
+            # Further filter by project
             if project_name:
-                project = next((p for p in server.projects.get()[0] 
-                             if p.name.lower() == project_name.lower()), None)
+                projects, _ = server.projects.get()
+                project = next((p for p in projects if p.name.strip().lower() == project_name.strip().lower()), None)
                 if not project:
-                    return {
-                        "success": False,
-                        "message": f"Project '{project_name}' not found"
-                    }
-                filtered_items = [item for item in filtered_items 
-                               if item.project_id == project.id]
+                    return {"success": False, "message": f"Project '{project_name}' not found."}
+                filtered = [item for item in filtered if item.project_id == project.id]
 
-            if not filtered_items:
-                return {
-                    "success": False,
-                    "message": f"{content_type} '{content_name}' not found" + 
-                             (f" in project '{project_name}'" if project_name else "")
-                }
-            if len(filtered_items) > 1:
-                return {
-                    "success": False,
-                    "message": f"Multiple {content_type}s found with name '{content_name}'." + 
-                             (" Provide project name to narrow down." if not project_name else "")
-                }
+            if not filtered:
+                return {"success": False, "message": f"{content_type.capitalize()} '{content_name}' not found."}
+            if len(filtered) > 1:
+                return {"success": False, "message": f"Multiple items named '{content_name}' found. Please specify a project."}
 
-            content_item = filtered_items[0]
-            file_ext = format_type if content_type.lower() == 'workbook' else 'tds'
-            download_path = os.path.join(download_path_base, f"{content_name.replace(' ', '_')}.{file_ext}")
+            item = filtered[0]
 
-            # Download with appropriate method
-            if content_type.lower() == 'workbook':
-                server.workbooks.download(
-                    content_item.id,
-                    filepath=download_path,
-                    no_extract=False,
-                    include_extract=False
-                )
+            # Let Tableau assign file path, then rename
+            if content_type == "workbook":
+                downloaded_path = server.workbooks.download(item.id, filepath=download_dir, include_extract=False)
             else:
-                server.datasources.download(
-                    content_item.id,
-                    filepath=download_path,
-                    no_extract=False
-                )
+                downloaded_path = server.datasources.download(item.id, filepath=download_dir)
+
+            final_path = os.path.join(download_dir, f"{content_name.replace(' ', '_')}.{extension}")
+            if downloaded_path != final_path:
+                os.rename(downloaded_path, final_path)
 
             return {
                 "success": True,
-                "message": f"Downloaded {content_type} '{content_name}' successfully",
-                "download_path": download_path
+                "message": f"Downloaded {content_type} '{content_name}' successfully.",
+                "download_path": final_path
             }
 
     except Exception as e:
-        logger.error(f"Error downloading content: {str(e)}", exc_info=True)
-        return {
-            "success": False,
-            "message": f"Error downloading content: {str(e)}"
-        }
-
-
+        logger.error(f"Error downloading {content_type}: {e}", exc_info=True)
+        return {"success": False, "message": f"Error downloading content: {e}"}

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pyyaml
+tableauserverclient
+pydantic
+requests
+httpx
+pydantic[email]
+requests_toolbelt>=0.9.1
+pytest
+pytest-asyncio
