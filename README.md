@@ -7,6 +7,7 @@ Automate Tableau operations such as content management, ownership transfer, down
 
 ## 🗂️ Project Structure
 
+
 ```
 tableau_automation/
 ├── main.py                         # Optional FastAPI entry point
@@ -37,7 +38,6 @@ tableau_automation/
 └── .gitignore
 ```
 
----
 
 ## ⚙️ Setup Instructions
 
@@ -117,14 +117,17 @@ Open in browser: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ## 💬 Interview Highlights
 
+
 - **Primary focus is on automation scripts**, not APIs.
 - **All logic is config-driven** via YAML for easy changes.
 - **Secure PAT-based access** for Tableau authentication.
 - **Test cases included** for repeatable validations.
 - **Slack integration** for alerts/notifications on execution.
 
+
 ---
 
 ## 📜 License
 
 MIT License – free for personal and commercial use.
+
