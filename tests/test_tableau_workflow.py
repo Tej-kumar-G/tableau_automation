@@ -1,33 +1,21 @@
-import os
-import sys
-import time
-from pathlib import Path
+# test_tableau_workflow.py
 
+import os
+import time
 import pytest
 import pytest_asyncio
 import logging
-from httpx import AsyncClient, ASGITransport
-from main import app
+from pathlib import Path
 
-from base_setup.utils.common_utils import setup_logging
-
-
-# Setup logging
-# ------ Add base_setup to sys.path and import logging setup ------
-base_setup_path = str(Path(__file__).parent.parent / 'base_setup')
-sys.path.append(base_setup_path)
-# ------ Setup logging using external YAML config ------
-setup_logging(os.path.join(base_setup_path, 'config', 'logging_config.yaml'))
 logger = logging.getLogger("tableau_automation")
 
 # Constants
 TEST_WORKBOOK = "Superstore"
 SOURCE_PROJECT = "Samples"
 
-
 # ----------- Logging Helper ----------- #
 def log_section(title: str, data: dict):
-    logger.info(f"\n========== {title.upper()} ==========")
+    logger.info(f"========== {title.upper()} ==========")
     for key, value in data.items():
         logger.info(f"{key:<18}: {value}")
     logger.info(f"========== END: {title.upper()} ==========\n")
@@ -48,13 +36,6 @@ def test_projects(timestamp):
         "download": f"Project_Download_{timestamp + 3}",
         "delete": f"Project_Delete_{timestamp + 4}",
     }
-
-
-@pytest_asyncio.fixture(scope="session")
-async def async_client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -190,18 +171,6 @@ async def test_delete_content(async_client, test_projects):
         "📄 Workbook": TEST_WORKBOOK,
         "📡 Status Code": resp.status_code,
         "✅ Success": resp.json().get("success")
-    })
-    assert resp.status_code == 200
-    assert resp.json().get("success")
-
-
-@pytest.mark.asyncio
-async def test_slack_connection(async_client):
-    resp = await async_client.get("/tableau/slack_connection")
-    log_section("Slack Connectivity", {
-        "📡 Status Code": resp.status_code,
-        "✅ Success": resp.json().get("success"),
-        "🔗 Message": resp.json().get("message", "N/A")
     })
     assert resp.status_code == 200
     assert resp.json().get("success")

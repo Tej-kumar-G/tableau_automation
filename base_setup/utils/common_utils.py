@@ -25,6 +25,7 @@ def setup_logging(logging_config_path: str):
             log_dir = os.path.dirname(log_file_path)
             os.makedirs(log_dir, exist_ok=True)
             logging.config.dictConfig(logging_config)
+            return logging.getLogger("tableau_automation")
     except Exception as e:
         raise Exception(f"Error setting up logging: {str(e)}")
 
