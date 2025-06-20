@@ -16,8 +16,15 @@ def load_config(config_path: str) -> dict:
         raise Exception(f"Error loading config file {config_path}: {str(e)}")
 
 
+_LOGGER_INITIALIZED = False
+
+
 def setup_logging(logging_config_path: str):
-    """Setup logging configuration."""
+    """Setup logging configuration once and return logger."""
+    global _LOGGER_INITIALIZED
+    if _LOGGER_INITIALIZED:
+        return logging.getLogger("tableau_automation")
+
     try:
         with open(logging_config_path, 'r') as file:
             logging_config = yaml.safe_load(file)
@@ -25,6 +32,7 @@ def setup_logging(logging_config_path: str):
             log_dir = os.path.dirname(log_file_path)
             os.makedirs(log_dir, exist_ok=True)
             logging.config.dictConfig(logging_config)
+            _LOGGER_INITIALIZED = True
             return logging.getLogger("tableau_automation")
     except Exception as e:
         raise Exception(f"Error setting up logging: {str(e)}")

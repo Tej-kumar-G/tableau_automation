@@ -1,11 +1,24 @@
-# test_misc_connectivity.py
-
-import logging
+import json
+import os
+import sys
+from pathlib import Path
 import pytest
 
-logger = logging.getLogger("tableau_automation")
+# ----------------- Path Setup ----------------- #
+base_path = Path(__file__).parent
+base_setup_path = os.path.join(base_path.parent, 'base_setup')
+sys.path.append(base_setup_path)
+
+# ----------------- Imports ----------------- #
+from base_setup.utils.common_utils import load_config, setup_logging
+
+# ----------------- Config & Logging ----------------- #
+config = load_config(os.path.join(base_setup_path, 'config', 'config.yaml'))
+test_cfg = config['test_data']
+logger = setup_logging(os.path.join(base_setup_path, 'config', 'logging_config.yaml'))
 
 
+# ----------------- Logging Helper ----------------- #
 def log_section(title: str, data: dict):
     logger.info(f"========== {title.upper()} ==========")
     for key, value in data.items():
@@ -13,6 +26,7 @@ def log_section(title: str, data: dict):
     logger.info(f"========== END: {title.upper()} ==========\n")
 
 
+# ----------------- Test Cases ----------------- #
 @pytest.mark.asyncio
 async def test_slack_connection(async_client):
     resp = await async_client.get("/tableau/slack_connection")
@@ -27,15 +41,18 @@ async def test_slack_connection(async_client):
 
 @pytest.mark.asyncio
 async def test_audit_sites(async_client):
-    resp = await async_client.post("/tableau/audit_site", params={
-        "site_name": "nitidev",
-    })
+    site_name = test_cfg["site_name"]
+
+    resp = await async_client.post("/tableau/audit_site", params={"site_name": site_name})
+
+    result = resp.json()
+
     log_section("Audit Sites", {
         "📡 Status Code": resp.status_code,
-        "✅ Site": resp.json().get("site"),
-        "📊 User Count": resp.json().get("user_count"),
-        "👥 Group Count": resp.json().get("group_count"),
-        "📋 Role Breakdown": resp.json().get("role_breakdown", {})
+        "✅ Site": result.get("site"),
+        "📊 User Count": result.get("user_count"),
+        "👥 Group Count": result.get("group_count"),
+        "📋 Role Breakdown": result.get("role_breakdown", {})
     })
     assert resp.status_code == 200
 
@@ -56,7 +73,7 @@ async def test_validate_personal_spaces(async_client):
 @pytest.mark.asyncio
 async def test_get_lineage_for_workbook(async_client):
     resp = await async_client.get("/tableau/get_lineage_for_workbook", params={
-        "workbook_name": "Superstore"
+        "workbook_name": test_cfg["workbook_name"]
     })
     log_section("Get Lineage for Workbook", {
         "📡 Status Code": resp.status_code,
@@ -71,7 +88,7 @@ async def test_get_lineage_for_workbook(async_client):
 @pytest.mark.asyncio
 async def test_check_tcm_access(async_client):
     resp = await async_client.get("/tableau/check_tcm_access", params={
-        "site_name": "nitidev"
+        "site_name": test_cfg["site_name"]
     })
     log_section("Check TCM Access", {
         "📡 Status Code": resp.status_code,
@@ -85,7 +102,7 @@ async def test_check_tcm_access(async_client):
 @pytest.mark.asyncio
 async def test_download_view_features(async_client):
     resp = await async_client.get("/tableau/download_view_features", params={
-        "view_name": "Product",
+        "view_name": test_cfg["view_name"],
         "download_format": "image"
     })
     log_section("Download View Features", {
@@ -101,7 +118,7 @@ async def test_download_view_features(async_client):
 @pytest.mark.asyncio
 async def test_check_extensions_in_workbook(async_client):
     resp = await async_client.get("/tableau/check_extensions_in_workbook", params={
-        "workbook_name": "Superstore"
+        "workbook_name": test_cfg["workbook_name"]
     })
     log_section("Check Extensions in Workbook", {
         "📡 Status Code": resp.status_code,
@@ -112,7 +129,7 @@ async def test_check_extensions_in_workbook(async_client):
         "🔗 Viz Ext Used": resp.json().get("viz_ext_used")
     })
     assert resp.status_code == 200
-    assert resp.json().get("workbook") == "Superstore"
+    assert resp.json().get("workbook") == test_cfg["workbook_name"]
 
 
 @pytest.mark.asyncio
@@ -125,3 +142,21 @@ async def test_content_labels_and_description(async_client):
     })
     assert resp.status_code == 200
     assert resp.json().get("success") is True
+
+
+@pytest.mark.asyncio
+async def test_validate_pulse(async_client):
+    resp = await async_client.get("/tableau/validate_pulse", params={
+        "datastore_name": test_cfg["datastore_name"]
+    })
+    log_section("Validate Pulse", {
+        "📡 Status Code": resp.status_code,
+        "✅ Success": resp.json().get("success"),
+        "🔗 Message": resp.json().get("message", "N/A")
+    })
+    assert resp.status_code == 200
+    if resp.json().get("success") is False:
+        assert resp.json().get("message") == "Pulse is not enabled on this site."
+    else:
+        assert resp.json().get("success") is True
+        assert resp.json().get("message") == "Pulse metric created successfully."

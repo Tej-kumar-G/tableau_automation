@@ -13,6 +13,7 @@ from scripts.download_utils.download_view_assets import download_view_asset
 from scripts.monitoring.audit_multiple_sites import audit_site_user_group_roles
 from scripts.monitoring.check_tcm_access import check_tcm_access
 from scripts.monitoring.validate_personal_space import validate_personal_spaces
+from scripts.monitoring.validate_tableau_pulse import create_pulse_metric
 from scripts.revision_history.get_revision_history import get_revision_history
 from scripts.site_monitoring.slack_connectivity import slack_integration_with_webhook
 
@@ -173,6 +174,15 @@ def check_tcm_access_for_site(site_name: str = None):
     """
     # Implement the actual access check logic here
     return check_tcm_access(site_name)
+
+
+@router.get("/validate_pulse")
+def validate_pulse(datastore_name: str = None):
+    """
+    Placeholder endpoint to validate Tableau Pulse.
+    This can be replaced with actual logic to check if Tableau Pulse is enabled.
+    """
+    return create_pulse_metric(datastore_name)
 
 
 @router.get("/download_view_features")

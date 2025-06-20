@@ -53,3 +53,5 @@ poetry.lock
 
 # Sensitive configuration file
 base_setup/config/config.yaml
+
+base_setup/snapshots/

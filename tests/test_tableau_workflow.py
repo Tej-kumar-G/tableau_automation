@@ -1,19 +1,32 @@
-# test_tableau_workflow.py
-
 import os
+import sys
 import time
 import pytest
 import pytest_asyncio
 import logging
 from pathlib import Path
 
-logger = logging.getLogger("tableau_automation")
+# ----------------- Path Setup ----------------- #
+base_path = Path(__file__).parent
+base_setup_path = os.path.join(base_path.parent, 'base_setup')
+sys.path.append(base_setup_path)
 
-# Constants
-TEST_WORKBOOK = "Superstore"
-SOURCE_PROJECT = "Samples"
+# ----------------- Imports ----------------- #
+from base_setup.utils.common_utils import load_config, setup_logging
 
-# ----------- Logging Helper ----------- #
+# ----------------- Config & Logging ----------------- #
+config = load_config(os.path.join(base_setup_path, 'config', 'config.yaml'))
+test_cfg = config['test_data']
+logger = setup_logging(os.path.join(base_setup_path, 'config', 'logging_config.yaml'))
+
+# ----------------- Constants ----------------- #
+TEST_WORKBOOK = test_cfg["workbook_name"]
+SOURCE_PROJECT = test_cfg["source_project"]
+CURRENT_OWNER = test_cfg["owner_current"]
+NEW_OWNER = test_cfg["owner_new"]
+
+
+# ----------------- Logging Helper ----------------- #
 def log_section(title: str, data: dict):
     logger.info(f"========== {title.upper()} ==========")
     for key, value in data.items():
@@ -21,7 +34,7 @@ def log_section(title: str, data: dict):
     logger.info(f"========== END: {title.upper()} ==========\n")
 
 
-# ----------- Fixtures ----------- #
+# ----------------- Fixtures ----------------- #
 @pytest.fixture(scope="session")
 def timestamp():
     return int(time.time())
@@ -59,7 +72,7 @@ async def one_time_project_setup_and_teardown(async_client, test_projects):
         logger.info(f"🗑️ Deleted [{key}] '{name}' -> {resp.status_code}")
 
 
-# ----------- Helper ----------- #
+# ----------------- Helper ----------------- #
 async def copy_workbook(async_client, project):
     logger.info(f"📥 Copying workbook '{TEST_WORKBOOK}' to project '{project}'")
     resp = await async_client.post("/tableau/copy_content", json={
@@ -71,8 +84,7 @@ async def copy_workbook(async_client, project):
     return resp
 
 
-# ----------- Test Cases ----------- #
-
+# ----------------- Test Cases ----------------- #
 @pytest.mark.asyncio
 async def test_create_project(async_client, test_projects):
     project = test_projects["create"]
@@ -113,20 +125,18 @@ async def test_move_content(async_client, test_projects):
 async def test_update_ownership(async_client, test_projects):
     project = test_projects["ownership"]
     await copy_workbook(async_client, project)
-    current_owner = "tej.gangineni@gmail.com"
-    new_owner = "nitheeshkumargorla111@gmail.com"
     resp = await async_client.post("/tableau/update_ownership", json={
         "content_type": "workbook",
         "content_name": TEST_WORKBOOK,
         "project_name": project,
-        "current_owner": current_owner,
-        "new_owner": new_owner
+        "current_owner": CURRENT_OWNER,
+        "new_owner": NEW_OWNER
     })
     log_section("Update Ownership", {
         "📁 Project": project,
         "📄 Workbook": TEST_WORKBOOK,
-        "👤 From": current_owner,
-        "👤 To": new_owner,
+        "👤 From": CURRENT_OWNER,
+        "👤 To": NEW_OWNER,
         "📡 Status Code": resp.status_code,
         "✅ Success": resp.json().get("success")
     })
