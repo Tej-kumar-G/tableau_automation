@@ -1,4 +1,5 @@
 import smtplib
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
@@ -15,11 +16,13 @@ def send_email(subject, body_html, config):
     msg.attach(MIMEText(body_html, 'html'))
 
     try:
+        start = time.perf_counter()
         with smtplib.SMTP(mail_cfg['smtp_server'], int(mail_cfg['port'])) as server:
+            server.set_debuglevel(1)  # For verbose output
             server.starttls()
-            # 🔐 Login with email and app password
             server.login(mail_cfg['mail_from'], mail_cfg['password'])
             server.sendmail(msg['From'], mail_cfg['mail_to'].split(','), msg.as_string())
-            logger.info("✅ Email sent successfully.")
+            elapsed = time.perf_counter() - start
+            logger.info(f"✅ Email sent successfully in {elapsed:.2f} seconds.")
     except Exception as e:
         logger.error(f"❌ Failed to send email: {e}")

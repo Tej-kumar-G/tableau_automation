@@ -14,8 +14,8 @@ sys.path.append(base_setup_path)
 from base_setup.utils.common_utils import load_config, setup_logging, get_tableau_server_and_auth
 
 # Logging
-setup_logging(os.path.join(base_setup_path, 'config', 'logging_config.yaml'))
-logger = logging.getLogger("tableau_automation")
+logger = setup_logging(os.path.join(base_setup_path, 'config', 'logging_config.yaml'))
+
 
 
 def find_project(server: TSC.Server, project_name: str) -> Optional[TSC.ProjectItem]:
